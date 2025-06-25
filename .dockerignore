@@ -1,0 +1,29 @@
+# 版本控制
+.git
+.gitignore
+
+# 虚拟环境
+.venv
+venv
+__pycache__
+
+# 临时文件和日志
+tmp/*
+logs/*
+*.log
+test_results_*.json
+
+# 测试文件
+test_*.py
+test_*.json
+concurrent_test_*.log
+
+# IDE和编辑器文件
+.vscode
+.idea
+*.swp
+*.swo
+
+# 不需要打包的文档
+README.md
+LICENSE 

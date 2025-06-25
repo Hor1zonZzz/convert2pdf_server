@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: convert-file2pdf-config
+data:
+  S3_BUCKET_NAME: "publicfiles"
+  S3_REGION: "us-east-1"
+  PDF_EXPIRE_TIME: "0"
+  S3_ENDPOINT_URL: "http://127.0.0.1:9000"
+  DOWNLOAD_URL_PREFIX: "http://example.com"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: convert-file2pdf-secret
+type: Opaque
+data:
+  # 这些是base64编码的，生产环境请更改
+  S3_ACCESS_KEY_ID: O  # base64编码的ak
+  S3_SECRET_ACCESS_KEY: O  # base64编码的sk
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: convert-file2pdf-deployment
+  labels:
+    app: convert-file2pdf
+spec:
+  replicas: 8  # 设置副本数，根据需要调整
+  selector:
+    matchLabels:
+      app: convert-file2pdf
+  template:
+    metadata:
+      labels:
+        app: convert-file2pdf
+    spec:
+      dnsConfig:
+        nameservers:
+        - 8.8.8.8  # Google DNS
+        - 114.114.114.114  # 国内常用DNS
+      containers:
+      - name: convert-file2pdf
+        image: swr.cn-north-4.myhuaweicloud.com/wyyy/convert2pdf_server:0.4.0  
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 7758
+        resources:
+          limits:
+            cpu: "2"
+            memory: "1Gi"
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+        envFrom:
+        - configMapRef:
+            name: convert-file2pdf-config
+        - secretRef:
+            name: convert-file2pdf-secret
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /app/tmp
+        - name: logs-volume
+          mountPath: /app/logs
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 7758
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 7758
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}
+      - name: logs-volume
+        persistentVolumeClaim:
+          claimName: convert-file2pdf-logs-pvc
+---
+# PersistentVolume for logs
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: convert-file2pdf-logs-pv
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-path
+  local:
+    path: /data/V2/k8s/volumes/convert-file2pdf-logs
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - huawei
+---
+# PersistentVolumeClaim for logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: convert-file2pdf-logs-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: convert-file2pdf-service
+spec:
+  selector:
+    app: convert-file2pdf
+  ports:
+  - port: 80
+    targetPort: 7758
+    nodePort: 31758  # 指定固定的外部访问端口 (30000-32767范围内)
+  type: NodePort
+---
+# 可选：如果需要在集群外部访问
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: convert-file2pdf-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: convert.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: convert-file2pdf-service
+            port:
+              number: 80
