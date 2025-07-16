@@ -33,6 +33,9 @@ PDF_EXPIRE_TIME = int(os.getenv("PDF_EXPIRE_TIME", 0))
 # 返回的下载地址，如果为空则返回S3ENDPOINTURL/BUCKETNAME/convert_file2pdf_server/文件名，不为空返回响应里为这里的下载地址开头，用于进行了端口映射后的情况
 DOWNLOAD_URL_PREFIX = os.getenv("DOWNLOAD_URL_PREFIX", "")
 
+# 下载文件时是否校验 SSL 证书，默认关闭（即跳过校验）；如需开启请将环境变量 DOWNLOAD_SSL_VERIFY 设为 true/1/yes
+DOWNLOAD_SSL_VERIFY = os.getenv("DOWNLOAD_SSL_VERIFY", "false").lower() not in ("false", "0", "no")
+
 # 1、文档格式
 document_input_formats = [
     '.odt',   # OpenDocument文本文档
@@ -289,9 +292,28 @@ async def convert(request: Request):
             if file_url:
                 # 从URL下载文件
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(file_url,timeout=aiohttp.ClientTimeout(total=300)) as response:
-                        with open(download_file_path, "wb") as f:
-                            f.write(await response.read())
+                    try:
+                        async with session.get(
+                            file_url,
+                            timeout=aiohttp.ClientTimeout(total=300),
+                            ssl=DOWNLOAD_SSL_VERIFY  # 根据环境变量决定是否校验 SSL
+                        ) as response:
+                            if response.status != 200:
+                                # 记录非 200 状态码以便排查
+                                logger.error(
+                                    f"Failed to download file, url: {file_url}, status: {response.status}, reason: {response.reason}"
+                                )
+                                raise RuntimeError(
+                                    f"Download failed, status code: {response.status}, reason: {response.reason}"
+                                )
+                            with open(download_file_path, "wb") as f:
+                                f.write(await response.read())
+                    except Exception as download_exc:
+                        # 捕获下载过程中的异常，输出更详细的日志
+                        logger.error(
+                            f"Exception occurred while downloading file: {file_url}, error: {download_exc}"
+                        )
+                        raise
                 logger.info(f"File downloaded successfully, file_url: {file_url}, time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
             else:
                 # 保存上传的文件
