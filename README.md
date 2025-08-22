@@ -2,11 +2,60 @@
 
 ## 1. 简述
 
-1.1 该服务最初出发点是在rag过程中文档有很多文档格式，将文档都转为pdf后可以实现同构，后续的文字提取，图片处理的具体操作只需对pdf一种格式进行处理即可。同时将这个需求抽象出来，多种不同的业务都可以调用这个服务。
+### 1.1 项目说明
 
-1.2 同时文件格式转化的工具，很多对操作系统(linux/windows/macos),以及cpu架构（x86/arm64）大多数都有条件依赖，并不通用，换一个客户就要换一种解决方案，本服务也是为了解决这个问题，不管业务方什么操作系统，什么底层架构，均可快速将多格式文档归一为pdf格式，并且信息损失最小。
+**A** **项目出发点**: 是在rag过程中文档有很多文档格式，将文档都转为pdf后可以实现同构，后续的文字提取，图片处理的具体操作只需对pdf一种格式进行处理即可。同时将这个需求抽象出来，多种不同的业务都可以调用这个服务。
 
-1.3 本服务因为了支持直接部署+容器+高并发生产需求，所以项目整体目录看起来有一定的复杂度。但是**快速开发和简单使用时**，仅需知道核心原理，查看**“直接部署”**的部分和“main.py”即可快速上手，满足基本业务需求。所以不需要有畏难情绪。
+**B** **多架构适配**: 同时文件格式转化的工具，很多对操作系统(linux/windows/macos),以及cpu架构（x86/arm64）大多数都有条件依赖，并不通用，换一个客户就要换一种解决方案，本服务也是为了解决这个问题，不管业务方什么操作系统，什么底层架构，均可快速将多格式文档归一为pdf格式，并且信息损失最小。
+
+**C** **概述**: 本服务因为了支持直接部署+容器+高并发生产需求，所以项目整体目录看起来有一定的复杂度。但是**快速开发和简单使用时**，仅需知道核心原理，查看**“直接部署”**的部分和“main.py”即可快速上手，满足基本业务需求。所以不需要有畏难情绪。
+
+### 1.2 快速开始（省流不看版&&部署生产）
+
+> Tips: 省流版部署基于 `ARM64` 架构构建的镜像，仅用于在 `ARM64` 架构上部署
+> &emsp;&emsp;&ensp;若要在 `X86` 架构上部署需要按下面流程进行部署
+
+需要先配置存储环境 `MinIO` 参考[minio容器启动方法](./doc/minio容器启动方法.md)
+
+```
+# 拉取docker镜像
+docker pull swr.cn-north-4.myhuaweicloud.com/wyyy/convert2pdf_server:0.4.0
+
+# 拉取仓库
+git clone https://github.com/ppppangu/convert2pdf_server
+
+# 进入项目目录
+cd convert2pdf_server
+
+# 使用uv包管理工具同步虚拟环境
+uv sync -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 编写.env文件配置环境
+
+# 启动
+uv run python ./main_muti_docker.py
+```
+
+### 1.3 使用服务
+
+**请求示例：**
+
+```bash
+curl --location 'http://服务启动的IP:7758/convert' \
+--form 'file_url="https://www.bjmtg.gov.cn/bjmtg/2024zcwj/202505/eeeddd638a6c46f6baa96d78673d94ae/files/d45ec828cedf4906baaaedb42c94a319.doc"'
+```
+
+**响应示例：**
+
+```json
+{
+  "status": "success",
+  "original_source": "https://www.bjmtg.gov.cn/bjmtg/2024zcwj/202505/eeeddd638a6c46f6baa96d78673d94ae/files/d45ec828cedf4906baaaedb42c94a319.doc",
+  "converted_url": "https://149min9000.cpolar.cn/publicfiles/convert_file2pdf_server/1755771316.037417_d45ec828cedf4906baaaedb42c94a319.pdf",
+  "original_url": "https://www.bjmtg.gov.cn/bjmtg/2024zcwj/202505/eeeddd638a6c46f6baa96d78673d94ae/files/d45ec828cedf4906baaaedb42c94a319.doc"
+}
+```
+
 
 ## 2. 使用流程一览
 
@@ -17,11 +66,14 @@ graph LR
   START[开始部署] --> CHOOSE{选择部署方式}
 
   CHOOSE -->|直接部署（POC推荐）| DIRECT[配置Python环境<br/>安装依赖包<br/>启动应用服务]
+  CHOOSE -->|多容器并行部署（生产推荐）| MULTI[使用main_muti_docker.py<br/>动态创建容器并行处理]
   CHOOSE -->|Docker部署| DOCKER[构建Docker镜像<br/>运行Docker容器]
   CHOOSE -->|Docker-Compose部署| COMPOSE[编写docker-compose.yml<br/>docker-compose up]
+  
   CHOOSE -->|Kubernetes部署| K8S[创建K8s配置文件<br/>kubectl apply部署]
 
   DIRECT --> READY[✅ 服务就绪]
+  MULTI --> READY
   DOCKER --> READY
   COMPOSE --> READY
   K8S --> READY
@@ -57,7 +109,7 @@ graph LR
 >
 > 3、支持文件自动过期，无需手动管理中间文件的硬盘空间占用；
 >
-> 4、可根据业务需求自行选择：直接部署服务，docker/docker-compose部署，k8s部署；
+> 4、可根据业务需求自行选择：直接部署服务，multi_docker多容器并行部署，docker/docker-compose部署，k8s部署；
 >
 > 5、三种部署方式均支持并发，属于cpu密集型任务；
 >
@@ -116,12 +168,12 @@ graph LR
 
 > 适用于快速验证、开发调试、小规模使用
 
-| 组件                  | 说明                                         | 最低版本     | 安装指导                                                                                                                             |
-| --------------------- | -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Python**      | Python 运行时环境                            | 3.12         | [官网下载](https://www.python.org/downloads/)                                                                                           |
+| 组件            | 说明                                         | 最低版本     | 安装指导                                                                                                                              |
+| --------------- | -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Python**      | Python 运行时环境                            | 3.12         | [官网下载](https://www.python.org/downloads/)                                                                                         |
 | **uv**          | Python 包管理工具（推荐）                    | 最新版       | `pip install uv` 或 [官方安装指南](https://docs.astral.sh/uv/getting-started/installation/)                                           |
-| **LibreOffice** | 核心转换引擎，确保 `soffice` 命令可用      | 7.x          | [官网下载](https://www.libreoffice.org/download/download/) 或 `sudo apt install libreoffice`，windows/linux/macos均可下载，具体查csdn |
-| **MinIO/S3**    | 对象存储服务，需要创建 Bucket 并获取访问密钥 | 任意兼容版本 | [MinIO 部署指南](https://min.io/docs/minio/linux/operations/installation.html)                                                          |
+| **LibreOffice** | 核心转换引擎，确保 `soffice` 命令可用        | 7.x          | [官网下载](https://www.libreoffice.org/download/download/) 或 `sudo apt install libreoffice`，windows/linux/macos均可下载，具体查csdn |
+| **MinIO/S3**    | 对象存储服务，需要创建 Bucket 并获取访问密钥 | 任意兼容版本 | [MinIO 部署指南](https://min.io/docs/minio/linux/operations/installation.html)                                                        |
 
 **LibreOffice 安装验证**：
 
@@ -135,11 +187,11 @@ soffice --version
 
 > 推荐用于生产环境的单机/小集群部署
 
-| 组件                     | 说明                                         | 最低版本     | 安装指导                                         |
-| ------------------------ | -------------------------------------------- | ------------ | ------------------------------------------------ |
+| 组件               | 说明                                         | 最低版本     | 安装指导                                            |
+| ------------------ | -------------------------------------------- | ------------ | --------------------------------------------------- |
 | **Docker**         | 容器运行时                                   | 23.x         | [官方安装指南](https://docs.docker.com/get-docker/) |
-| **Docker Compose** | 容器编排工具（通常与 Docker 一起安装）       | 2.x          | `docker compose version` 验证，有文档          |
-| **MinIO/S3**       | 对象存储服务，需要创建 Bucket 并获取访问密钥 | 任意兼容版本 | 可通过 Docker 部署或使用云服务                   |
+| **Docker Compose** | 容器编排工具（通常与 Docker 一起安装）       | 2.x          | `docker compose version` 验证，有文档               |
+| **MinIO/S3**       | 对象存储服务，需要创建 Bucket 并获取访问密钥 | 任意兼容版本 | 可通过 Docker 部署或使用云服务                      |
 
 **Docker 安装验证**：
 
@@ -158,13 +210,13 @@ docker run hello-world
 
 > 适用于大规模并发、弹性伸缩场景（>50 并发）
 
-| 组件                   | 说明                                                  | 最低版本     | 安装指导                                                             |
-| ---------------------- | ----------------------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| 组件             | 说明                                                  | 最低版本     | 安装指导                                                                |
+| ---------------- | ----------------------------------------------------- | ------------ | ----------------------------------------------------------------------- |
 | **Kubectl**      | Kubernetes 命令行工具                                 | 1.26+        | [官方安装指南](https://kubernetes.io/docs/tasks/tools/install-kubectl/) |
-| **Kubernetes**   | 容器编排平台（集群）                                  | 1.26+        | 需要已有 K8s 集群或自建                                              |
+| **Kubernetes**   | 容器编排平台（集群）                                  | 1.26+        | 需要已有 K8s 集群或自建                                                 |
 | **Docker**       | 用于构建和推送镜像到私有仓库                          | 23.x         | [官方安装指南](https://docs.docker.com/get-docker/)                     |
-| **容器镜像仓库** | 存储应用镜像（如 Harbor、Docker Hub、云厂商镜像仓库） | -            | 根据选择的仓库查看文档，我用的话华为云的镜像仓库服务                 |
-| **MinIO/S3**     | 对象存储服务，建议使用云服务或集群内部署              | 任意兼容版本 | 推荐使用云服务保证高可用                                             |
+| **容器镜像仓库** | 存储应用镜像（如 Harbor、Docker Hub、云厂商镜像仓库） | -            | 根据选择的仓库查看文档，我用的话华为云的镜像仓库服务                    |
+| **MinIO/S3**     | 对象存储服务，建议使用云服务或集群内部署              | 任意兼容版本 | 推荐使用云服务保证高可用                                                |
 
 **Kubernetes 环境验证**：
 
@@ -271,7 +323,7 @@ uv run python main.py
 
 > 当预计并发转换量较大（>50 并发）时，建议使用 K8s，通过副本数或 HPA 横向扩展。
 
-完整部署指南请参见 [`README-k8s.md`](./README-k8s.md)。该文档包含：
+完整部署指南请参见 [`README-k8s.md`](./doc/README-k8s.md)。该文档包含：
 
 - 镜像准备与私有仓库推送
 - `Deployment` / `Service` / `Ingress` 示范 YAML
@@ -284,10 +336,10 @@ uv run python main.py
 
 部署完成后，即可通过以下 REST API 进行调用。
 
-| 接口                          | 方法 | 描述                                                       |
-| ----------------------------- | ---- | ---------------------------------------------------------- |
-| `/health`                   | GET  | 健康检查                                                   |
-| `/get_supported_file_types` | GET  | 获取服务支持的文件扩展名                                   |
+| 接口                        | 方法 | 描述                                           |
+| --------------------------- | ---- | ---------------------------------------------- |
+| `/health`                   | GET  | 健康检查                                       |
+| `/get_supported_file_types` | GET  | 获取服务支持的文件扩展名                       |
 | `/convert`                  | POST | 文件转 PDF（支持**URL 下载** 或 **直接上传**） |
 
 ### 1. 健康检查
@@ -350,6 +402,7 @@ curl -X POST http://<host>:<port>/convert \
 - 如需贡献，请提 PR 或 issue。
 - 更新日志请查看 Releases。
 - 要有更高的通用性还需更加优化，有需求提issue
+- 若要维护请查看[DEVELOPMENT_DOC.md](./doc/DEVELOPMENT_DOC.md) 文档。
 
 ## 一些说明
 
