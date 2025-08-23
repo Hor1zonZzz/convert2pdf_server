@@ -33,7 +33,7 @@ uv sync -i https://pypi.tuna.tsinghua.edu.cn/simple
 # 编写.env文件配置环境
 
 # 启动
-uv run python ./main_muti_docker.py
+uv run python ./main_multi_docker.py
 ```
 
 ### 1.3 使用服务
@@ -66,7 +66,7 @@ graph LR
   START[开始部署] --> CHOOSE{选择部署方式}
 
   CHOOSE -->|直接部署（POC推荐）| DIRECT[配置Python环境<br/>安装依赖包<br/>启动应用服务]
-  CHOOSE -->|多容器并行部署（生产推荐）| MULTI[使用main_muti_docker.py<br/>动态创建容器并行处理]
+  CHOOSE -->|多容器并行部署（生产推荐）| MULTI[使用main_multi_docker.py<br/>动态创建容器并行处理]
   CHOOSE -->|Docker部署| DOCKER[构建Docker镜像<br/>运行Docker容器]
   CHOOSE -->|Docker-Compose部署| COMPOSE[编写docker-compose.yml<br/>docker-compose up]
   
