@@ -5,7 +5,7 @@
 Convert2PDF Server 是一个高性能的文件格式转换服务，支持将多种文档格式转换为PDF。项目提供了两种实现方式：
 
 1. `main.py` - 直接使用 LibreOffice 进行文件转换
-2. `main_muti_docker.py` - 使用 Docker 容器进行分布式文件转换
+2. `main_multi_docker.py` - 使用 Docker 容器进行分布式文件转换
 
 ### 主要特性
 
@@ -176,7 +176,7 @@ kubectl apply -f k8s-hpa.yaml
 ```
 convert2pdf_server/
 ├── main.py                    # 直接转换版本
-├── main_muti_docker.py        # Docker容器转换版本
+├── main_multi_docker.py        # Docker容器转换版本
 ├── .env                       # 环境变量配置
 ├── pyproject.toml             # 项目依赖
 ├── dockerfile                 # Docker构建文件
@@ -212,9 +212,9 @@ graph TD
     F --> G[返回结果]
 ```
 
-#### 3. Docker容器管理 (main_muti_docker.py)
+#### 3. Docker容器管理 (main_multi_docker.py)
 
-`main_muti_docker.py` 使用 Docker 容器进行文件转换：
+`main_multi_docker.py` 使用 Docker 容器进行文件转换：
 
 ```python
 # 创建Docker客户端
@@ -371,9 +371,9 @@ docker logs -f <container_name>
 
 ## 版本差异说明
 
-### main.py vs main_muti_docker.py
+### main.py vs main_multi_docker.py
 
-| 特性           | main.py              | main_muti_docker.py |
+| 特性           | main.py              | main_multi_docker.py |
 | -------------- | -------------------- | ------------------- |
 | **转换方式**   | 直接调用 LibreOffice | Docker 容器         |
 | **并发处理**   | 单进程               | 多容器实例          |
@@ -385,9 +385,9 @@ docker logs -f <container_name>
 ### 选择建议
 
 - **开发/测试环境**：推荐使用 `main.py`，部署简单，易于调试
-- **生产环境**：推荐使用 `main_muti_docker.py`，支持高并发和水平扩展
+- **生产环境**：推荐使用 `main_multi_docker.py`，支持高并发和水平扩展
 - **资源受限环境**：使用 `main.py`，资源占用较少
-- **高负载场景**：使用 `main_muti_docker.py`，支持多实例负载均衡
+- **高负载场景**：使用 `main_multi_docker.py`，支持多实例负载均衡
 
 ---
 
