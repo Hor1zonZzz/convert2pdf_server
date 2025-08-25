@@ -16,7 +16,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, FileResponse
+from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Route
 
 # 加载环境变量,系统环境变量优先级最高
@@ -198,8 +198,6 @@ def create_docker_client():
         return None
 
 
-
-
 # Docker容器管理函数
 async def convert_file_with_docker(
     file_url: str = None, file_path: str = None, task_uuid: str = None
@@ -273,7 +271,7 @@ async def convert_file_with_docker(
             file_name = os.path.basename(file_path)
 
             # 使用主服务器的临时文件接口
-            temp_url = f"http://host.docker.internal:7758/temp/{task_uuid}/{file_name}"
+            temp_url = f"http://172.17.0.1:7758/temp/{task_uuid}/{file_name}"
             logger.info(f"File accessible at: {temp_url}")
 
             request_data = {"file_url": temp_url}
@@ -356,11 +354,11 @@ async def get_supported_file_types(request: Request):
 async def serve_temp_file(request: Request):
     task_uuid = request.path_params["task_uuid"]
     filename = request.path_params["filename"]
-    
+
     # 构造文件路径
     temp_dir = pathlib.Path(__file__).parent / "tmp" / task_uuid
     file_path = temp_dir / filename
-    
+
     if file_path.exists() and file_path.is_file():
         return FileResponse(file_path)
     else:
@@ -487,7 +485,6 @@ async def convert(request: Request):
 
         # 使用Docker容器转换文件为PDF
         try:
-
             logger.info(
                 f"Converting file with Docker container, task_uuid: {task_uuid}"
             )
@@ -507,6 +504,8 @@ async def convert(request: Request):
                 logger.info(
                     f"File conversion successful via Docker container, task_uuid: {task_uuid}"
                 )
+                del result["original_url"]
+                logger.info(f"Conversion result: {result}")
             else:
                 # 转换失败
                 logger.error(
