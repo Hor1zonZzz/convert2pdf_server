@@ -1,0 +1,4 @@
+# Convert2PDF Client Dependencies
+aiohttp>=3.8.0
+aiofiles>=0.8.0
+tqdm>=4.64.0
